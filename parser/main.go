@@ -31,7 +31,7 @@ func main() {
 	defer cancel()
 
 	// Ideally this would be args
-	const numWorkers = 8
+	const numWorkers = 16
 	const queueMaxSize = 10
 
 	// read Filename from stdin
@@ -81,10 +81,7 @@ func main() {
 		for i := range itemChannel {
 
 			//fmt.Printf("ITEM: %#v\n", i)
-			// TODO: To keep the queue small should I
-			//       * Only push when priority is > then highest priority in the queue
-			//       * remove the lowest priority item
-			//       Most operations are `O(log n) where n = h.len`
+
 			heap.Push(&iq, i)
 			iq.update(i, i.url, i.priority)
 
@@ -104,8 +101,6 @@ func main() {
 	}
 
 	wg.Wait()
-
-	// XXX: Is this happening `slightly` before the all threads have finished so sometimes the `iq.Len` does not contain all the elements ?
 
 	//fmt.Printf("\nElements in queue: %d\n\n", iq.Len())
 
