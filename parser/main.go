@@ -42,6 +42,10 @@ func main() {
 	}
 	filename = strings.TrimSuffix(filename, "\n")
 
+	if _, err := os.Stat(filename); err != nil {
+		log.Fatalf("Filename %s is not a valid path or the file does not exist", filename)
+	}
+
 	// This channel is used to send every read line in various go-routines.
 	msgChannel := make(chan string)
 
