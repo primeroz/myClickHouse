@@ -24,3 +24,6 @@ cd parser
 make build
 echo "PATH_TO_THE_FILE" | ./parser
 ```
+
+## Tests
+run `make test` to build and test the binary

@@ -14,7 +14,7 @@ clean: # Clean the project
 	go clean
 	rm ${BINARY_NAME}
 
-test: # Run Tests
+test: build # Run Tests
 	go test ./...
 
 dep: # Download deps
