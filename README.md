@@ -1,5 +1,7 @@
 # myClickHouse
 
+All code tested on Linux
+
 ## Test Data
 
 There is already a test data file in `data/output.txt` of roughly 400K lines
