@@ -12,6 +12,8 @@ import (
 	"sync"
 )
 
+// Item Struct for the Priority Queue elements
+// Priority is the LONG Value
 type Item struct {
 	url      string
 	priority int64
@@ -29,16 +31,14 @@ func main() {
 	defer cancel()
 
 	// Ideally this would be args
-	const numWorkers = 2
+	const numWorkers = 8
 
 	// read Filename from stdin
 	var filenameReader = bufio.NewReader(os.Stdin)
 	filename, err := filenameReader.ReadString('\n')
-
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	filename = strings.TrimSuffix(filename, "\n")
 
 	// This channel is used to send every read line in various go-routines.
@@ -48,17 +48,19 @@ func main() {
 	itemChannel := make(chan *Item)
 	defer close(itemChannel)
 
-	// open file
+	// open the Input file
 	f, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 
+	// Create the scanner for the open file
 	scanner := bufio.NewScanner(f)
 
 	// Read all lines from file and send them into channel
-	// Only one routine to read the whole file, this assumes we are not IO bound
+	// XXX: Only one routine to read the whole file, this assumes we are not IO bound.
+	// TODO: For multiple routines i need to control the file seek for each routine
 	go func() {
 		for scanner.Scan() {
 			row := scanner.Text()
@@ -69,6 +71,7 @@ func main() {
 		close(msgChannel)
 	}()
 
+	// Create the PriorityQueue
 	iq := make(ItemQueue, 0)
 	heap.Init(&iq)
 
@@ -77,11 +80,16 @@ func main() {
 		for i := range itemChannel {
 
 			//fmt.Printf("ITEM: %#v\n", i)
+			// TODO: To keep the queue small should I
+			//       * Only push when priority is > then highest priority in the queue
+			//       * remove the lowest priority item
+			//       Most operations are `O(log n) where n = h.len`
 			heap.Push(&iq, i)
 
 		}
 	}()
 
+	// Start the workers to process the records
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go processRecord(ctx, i, msgChannel, itemChannel)
@@ -122,7 +130,7 @@ func processRecord(ctx context.Context, id int, msgChannel chan string, itemChan
 				continue
 			}
 
-			// Insert a new item and then modify its priority.
+			// Create a new Item and push it in the itemChannel
 			item := &Item{
 				url:      url,
 				priority: priority,
