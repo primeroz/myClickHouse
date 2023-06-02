@@ -112,7 +112,7 @@ func main() {
 	}
 
 	for i := 1; i <= len(urls); i++ {
-		fmt.Printf("%s\n", urls[len(urls)-i])
+		fmt.Println(urls[len(urls)-i])
 	}
 
 }
@@ -120,7 +120,10 @@ func main() {
 func processRecord(ctx context.Context, id int, msgChannel chan string, itemChannel chan *Item) {
 	defer wg.Done()
 	localReadLines := 0
-	log.Printf("%d Worker thread has started", id)
+
+	if os.Getenv("LOG_DEBUG") != "" {
+		log.Printf("%d Worker thread has started", id)
+	}
 
 	for row := range msgChannel {
 		select {
@@ -150,8 +153,10 @@ func processRecord(ctx context.Context, id int, msgChannel chan string, itemChan
 
 	}
 
-	log.Printf("%d Worker thread has been completed", id)
-	log.Printf("%d Worker thread has processed %d lines", id, localReadLines)
+	if os.Getenv("LOG_DEBUG") != "" {
+		log.Printf("%d Worker thread has been completed", id)
+		log.Printf("%d Worker thread has processed %d lines", id, localReadLines)
+	}
 }
 
 // https://pkg.go.dev/container/heap#example-package-PriorityQueue
