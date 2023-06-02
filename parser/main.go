@@ -106,11 +106,19 @@ func main() {
 
 	// extract all the elements in the queue and print in reverse order
 	var urls []string
+
+	// Ensure the queue is of correct size, pop any low priority element above the MaxSize
+	for iq.Len() > queueMaxSize {
+		heap.Pop(&iq)
+	}
+
+	// Extract the Items into the urls slice
 	for iq.Len() > 0 {
 		popItem := heap.Pop(&iq).(*Item)
 		urls = append(urls, popItem.url)
 	}
 
+	// Print URLs in reverse order
 	for i := 1; i <= len(urls); i++ {
 		fmt.Println(urls[len(urls)-i])
 	}
