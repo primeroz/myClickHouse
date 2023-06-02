@@ -31,7 +31,8 @@ func main() {
 	defer cancel()
 
 	// Ideally this would be args
-	const numWorkers = 8
+	const numWorkers = 16
+	const queueMaxSize = 10
 
 	// read Filename from stdin
 	var filenameReader = bufio.NewReader(os.Stdin)
@@ -80,11 +81,15 @@ func main() {
 		for i := range itemChannel {
 
 			//fmt.Printf("ITEM: %#v\n", i)
-			// TODO: To keep the queue small should I
-			//       * Only push when priority is > then highest priority in the queue
-			//       * remove the lowest priority item
-			//       Most operations are `O(log n) where n = h.len`
+
 			heap.Push(&iq, i)
+			iq.update(i, i.url, i.priority)
+
+			// If the Queue is bigger than maxSize let's pop the `lowest priority` element out
+			// To keep in the list only maxSize elements with the highest priority
+			if iq.Len() > queueMaxSize {
+				heap.Pop(&iq)
+			}
 
 		}
 	}()
@@ -97,16 +102,19 @@ func main() {
 
 	wg.Wait()
 
-	// XXX: Is this happening `slightly` before the all threads have finished so sometimes the `iq.Len` does not contain all the elements ?
-
 	//fmt.Printf("\nElements in queue: %d\n\n", iq.Len())
 
-	// Print the Top 10 urls
-	for i := 0; i < 10; i++ {
+	// extract all the elements in the queue and print in reverse order
+	var urls []string
+	for iq.Len() > 0 {
 		popItem := heap.Pop(&iq).(*Item)
-		//fmt.Printf("%s - %d\n", popItem.url,popItem.priority)
-		fmt.Printf("%s\n", popItem.url)
+		urls = append(urls, popItem.url)
 	}
+
+	for i := 1; i <= len(urls); i++ {
+		fmt.Printf("%s\n", urls[len(urls)-i])
+	}
+
 }
 
 func processRecord(ctx context.Context, id int, msgChannel chan string, itemChannel chan *Item) {
@@ -150,8 +158,8 @@ func processRecord(ctx context.Context, id int, msgChannel chan string, itemChan
 func (iq ItemQueue) Len() int { return len(iq) }
 
 func (iq ItemQueue) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
-	return iq[i].priority > iq[j].priority
+	// We Will pop elements when the queue is too big to keep the queue at a consistent size, so we want lower than here
+	return iq[i].priority < iq[j].priority
 }
 
 func (iq ItemQueue) Swap(i, j int) {
@@ -167,13 +175,13 @@ func (iq *ItemQueue) Push(x any) {
 	*iq = append(*iq, item)
 }
 
-func (pq *ItemQueue) Pop() any {
-	old := *pq
+func (iq *ItemQueue) Pop() any {
+	old := *iq
 	n := len(old)
 	item := old[n-1]
 	old[n-1] = nil  // avoid memory leak
 	item.index = -1 // for safety
-	*pq = old[0 : n-1]
+	*iq = old[0 : n-1]
 	return item
 }
 
