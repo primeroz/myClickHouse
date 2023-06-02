@@ -91,10 +91,13 @@ func main() {
 
 	// XXX: Is this happening `slightly` before the all threads have finished so sometimes the `iq.Len` does not contain all the elements ?
 
-	//mt.Printf("\nElements in queue: %d\n\n", iq.Len())
+	//fmt.Printf("\nElements in queue: %d\n\n", iq.Len())
+
+	// Print the Top 10 urls
 	for i := 0; i < 10; i++ {
 		popItem := heap.Pop(&iq).(*Item)
-		fmt.Printf("ITEM: %#v\n", popItem)
+		//fmt.Printf("%s - %d\n", popItem.url,popItem.priority)
+		fmt.Printf("%s\n", popItem.url)
 	}
 }
 

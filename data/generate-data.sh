@@ -1,5 +1,7 @@
 #!env bash
 
+# Read the top 10 from the file `cat ../data/output.txt  | sort -k 2 -n -r | head -n 10`
+
 _lines="100000"
 _baseurl="http://api.tech.com/item"
 
