@@ -31,5 +31,6 @@ echo "PATH_TO_THE_FILE" | ./parser
 To run the simple test
 ```
 cd parser
+make clean
 make test
 ```
