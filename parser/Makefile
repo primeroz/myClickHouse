@@ -11,8 +11,8 @@ run: build # Run the parser using ../data/output.txt as input
 	echo "../data/output.txt" | ./${BINARY_NAME}
 
 clean: # Clean the project
-	go clean
-	rm ${BINARY_NAME}
+	go clean -testcache
+	rm -f ${BINARY_NAME}
 
 test: build # Run Tests
 	go test ./...
