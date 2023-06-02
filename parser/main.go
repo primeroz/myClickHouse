@@ -46,7 +46,7 @@ func main() {
 		log.Fatalf("Filename %s is not a valid path or the file does not exist", filename)
 	}
 
-	// This channel is used to send every read line in various go-routines.
+	// This channel is used to send every read line from the read routine to the worker routines.
 	msgChannel := make(chan string)
 
 	// This Channel is used to send Items into the priority queue serializer
