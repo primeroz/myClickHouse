@@ -1,8 +1,16 @@
-# myClickHouse
+# ClickHouse Test
 
-All code tested on Linux
+**Note**: All code tested on Linux
 
-## Flow
+**TOC**
+* [Application Flow and Description](#application-flow-and-description)
+* [Usage](#usage)
+  * [Input Data Set](#input-data)
+  * [Running the Parser](#running-the-parser)
+  * [Tests](#runnig-tests)
+* [Benchmarks](#benchmarks)
+
+## Application Flow and Description
 
 ```mermaid
 flowchart LR
@@ -16,8 +24,33 @@ flowchart LR
     E -->G[Queue TOP10]
     F -->G[Queue TOP10]
 ```
+
+### Reading the datafile
+
+The reading of the lines from the datafile is done through a `single routine` to keep the read operation simple without the need to track the position for each read thread. Parallelizing reading might be much easier if multiple input files were to be used.
+
+While not ideal this will not be a problem unless the read of data gets CPU bound which should not happen as long as the `processing` of the records is the most intensive operation for which the _spare_ threads are used
+
+The lines read from the datafile are split into batches to be processed by each worker thread through a `channel` shared between those routines
+
+### Processing the records
+
+I assumed this would be the most `demanding` threads from a CPU point of view and so those are the only routines for which multiple threads are used. 
+
+Each worker thread pulls a `batch` of lines from the `channel` shared with the read thread , build an `Item` and push it into a `channel` shared with the `QueueManager` thread 
+
+### Queue Manager
+
+The list of elements with the `highest value` is managed through a `priority queue` using the `heap container` packages. 
+
+From `Wikipedia` : `A heap is usually an array of objects that can be thought of as a tree. In a queue` 
+
+In the case of this Parser we are only interested in the `TOP 10` elements ( by priority/value ) in the queue but , as described in the docs, `The complexity is O(log n) where n = h.Len()`, so in order to keep the queue as small as possible (and so the complexity of any queue operation) at any given time the `LESS` function has been modified to allow for `POP()` to return the `lowest priority` element in the queue. 
+
+A separate `go routine` is used as a `Queue Manager` because the heap is not thread safe and so it can't be handled by multiple worker thread at the same time. A channel is used to push `Items` from the worker threads into the queue manager thread which then `Pushes` Items into the queue, prioritize them according to the Value and pop low priority elements out when the queue is bigger than 10
+
 ---
-## Running the Project
+## Usage
 
 ### Input Data
 
@@ -43,7 +76,7 @@ make build
 echo "PATH_TO_THE_FILE" | ./parser/parser
 ```
 
-### Runing Tests
+### Runnig Tests
 To run the simple test
 ```
 make test
