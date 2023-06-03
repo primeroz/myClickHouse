@@ -24,7 +24,7 @@ type Item struct {
 
 type ItemQueue []*Item
 
-// A waitgroup to handle all the go-routines
+// A waitgroup to handle all the worker routines
 var wg sync.WaitGroup
 
 // Read the filename from stdio and return as a string
@@ -46,7 +46,7 @@ func readFilePathFromStdio() (path string, err error) {
 	return filename, nil
 }
 
-// Read all lines from file and send them into channel
+// Read all lines from file and send them into channel as batches of batchSize to be consumed by the worker routines
 // XXX: Only one routine to read the whole file, this assumes we are not CPU bound.
 // TODO: For multiple routines i need to control the file seek for each routine
 func fileReader(ctx context.Context, f io.Reader, channel chan []string, batchSize int) {
@@ -86,7 +86,7 @@ func fileReader(ctx context.Context, f io.Reader, channel chan []string, batchSi
 }
 
 // Worker Function
-// Process each line , create an Item and push it into the itemChannel for the queue manager to handle
+// Process each batch of lines, create an Item and push it into the itemChannel for the queue manager to handle
 func processRecord(ctx context.Context, id int, readChannel chan []string, itemChannel chan *Item) {
 	defer wg.Done()
 	localReadLines := 0
@@ -136,10 +136,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Ideally this would be args
-	const numWorkers = 4
+	// Ideally these would be args
+	const numWorkers = 4 // On my laptop 4 seems to get the best performances
 	const queueMaxSize = 10
-	const batchSize = 1000
+	const batchSize = 1000 // On my laptop 1000 seems to get the best performances
 
 	// read Filename from stdin
 	filename, err := readFilePathFromStdio()
@@ -147,10 +147,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// This channel is used to send every read line from the read routine to the worker routines.
+	// This channel is used to pipe the batches of lines from the reader routine to the worker routines.
 	readChannel := make(chan []string)
 
-	// This Channel is used to send Items into the priority queue serializer
+	// This Channel is used to send Items into the priority queue serializer from the worker routines
 	itemChannel := make(chan *Item)
 
 	// open the Input file
@@ -167,7 +167,8 @@ func main() {
 	iq := make(ItemQueue, 0)
 	heap.Init(&iq)
 
-	// Serialize access to the priority queue
+	// Serialize access to the priority queue since the queue is not thread safe and we can't just handle it in each worker routine
+	// This is unlikely to be cpu bound
 	go func() {
 		for i := range itemChannel {
 
@@ -197,6 +198,8 @@ func main() {
 	close(itemChannel)
 
 	// extract all the elements in the queue and print in reverse order
+
+	// Hold the urls to print
 	var urls []string
 
 	// Ensure the queue is of correct size, pop any low priority element above the MaxSize
@@ -217,11 +220,12 @@ func main() {
 
 }
 
-// https://pkg.go.dev/container/heap#example-package-PriorityQueue
+// Copied from https://pkg.go.dev/container/heap#example-package-PriorityQueue
 func (iq ItemQueue) Len() int { return len(iq) }
 
 func (iq ItemQueue) Less(i, j int) bool {
-	// We Will pop elements when the queue is too big to keep the queue at a consistent size, so we want lower than here
+	// We need to POP the `lowest priority` element so we can keep the queue at the size we want with only the highest priority elements in it
+	// Change from `greater than` to `lower than` whenc ompared to the pkg.go.dev example
 	return iq[i].priority < iq[j].priority
 }
 
