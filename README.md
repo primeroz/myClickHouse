@@ -29,7 +29,7 @@ cd data
 ./generate-data.sh 1000000
 ```
 
-This will take a few hours to complete
+This will take a `while` to complete
 
 ### Running the Parser
 
