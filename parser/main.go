@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"container/heap"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -25,111 +27,44 @@ type ItemQueue []*Item
 // A waitgroup to handle all the go-routines
 var wg sync.WaitGroup
 
-func main() {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Ideally this would be args
-	const numWorkers = 16
-	const queueMaxSize = 10
-
+// Read the filename from stdio and return as a string
+func readFilePathFromStdio() (path string, err error) {
 	// read Filename from stdin
 	var filenameReader = bufio.NewReader(os.Stdin)
 	filename, err := filenameReader.ReadString('\n')
+
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
+
 	filename = strings.TrimSuffix(filename, "\n")
 
 	if _, err := os.Stat(filename); err != nil {
-		log.Fatalf("Filename %s is not a valid path or the file does not exist", filename)
+		return "", errors.New(fmt.Sprintf("Filename %s is not a valid path or the file does not exist", filename))
 	}
 
-	// This channel is used to send every read line from the read routine to the worker routines.
-	msgChannel := make(chan string)
+	return filename, nil
+}
 
-	// This Channel is used to send Items into the priority queue serializer
-	itemChannel := make(chan *Item)
-	defer close(itemChannel)
-
-	// open the Input file
-	f, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
+// Read all lines from file and send them into channel
+// XXX: Only one routine to read the whole file, this assumes we are not CPU bound.
+// TODO: For multiple routines i need to control the file seek for each routine
+func fileReader(ctx context.Context, f io.Reader, channel chan string) {
 	// Create the scanner for the open file
 	scanner := bufio.NewScanner(f)
 
-	// Read all lines from file and send them into channel
-	// XXX: Only one routine to read the whole file, this assumes we are not IO bound.
-	// TODO: For multiple routines i need to control the file seek for each routine
-	go func() {
-		for scanner.Scan() {
-			row := scanner.Text()
-			msgChannel <- row
-		}
-
-		// Signal the main thread that all lines have been read
-		close(msgChannel)
-	}()
-
-	// Create the PriorityQueue
-	iq := make(ItemQueue, 0)
-	heap.Init(&iq)
-
-	// Serialize access to the priority queue
-	go func() {
-		for i := range itemChannel {
-
-			//fmt.Printf("ITEM: %#v\n", i)
-
-			heap.Push(&iq, i)
-			iq.update(i, i.url, i.priority)
-
-			// If the Queue is bigger than maxSize let's pop the `lowest priority` element out
-			// To keep in the list only maxSize elements with the highest priority
-			if iq.Len() > queueMaxSize {
-				heap.Pop(&iq)
-			}
-
-		}
-	}()
-
-	// Start the workers to process the records
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go processRecord(ctx, i, msgChannel, itemChannel)
+	for scanner.Scan() {
+		row := scanner.Text()
+		channel <- row
 	}
 
-	wg.Wait()
-
-	//fmt.Printf("\nElements in queue: %d\n\n", iq.Len())
-
-	// extract all the elements in the queue and print in reverse order
-	var urls []string
-
-	// Ensure the queue is of correct size, pop any low priority element above the MaxSize
-	for iq.Len() > queueMaxSize {
-		heap.Pop(&iq)
-	}
-
-	// Extract the Items into the urls slice
-	for iq.Len() > 0 {
-		popItem := heap.Pop(&iq).(*Item)
-		urls = append(urls, popItem.url)
-	}
-
-	// Print URLs in reverse order
-	for i := 1; i <= len(urls); i++ {
-		fmt.Println(urls[len(urls)-i])
-	}
+	close(channel)
 
 }
 
-func processRecord(ctx context.Context, id int, msgChannel chan string, itemChannel chan *Item) {
+// Worker Function
+// Process each line , create an Item and push it into the itemChannel for the queue manager to handle
+func processRecord(ctx context.Context, id int, readChannel chan string, itemChannel chan *Item) {
 	defer wg.Done()
 	localReadLines := 0
 
@@ -137,7 +72,7 @@ func processRecord(ctx context.Context, id int, msgChannel chan string, itemChan
 		log.Printf("%d Worker thread has started", id)
 	}
 
-	for row := range msgChannel {
+	for row := range readChannel {
 		select {
 		case <-ctx.Done():
 			return
@@ -169,6 +104,92 @@ func processRecord(ctx context.Context, id int, msgChannel chan string, itemChan
 		log.Printf("%d Worker thread has been completed", id)
 		log.Printf("%d Worker thread has processed %d lines", id, localReadLines)
 	}
+}
+
+func main() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Ideally this would be args
+	const numWorkers = 4
+	const queueMaxSize = 10
+	const batchSize = 1000
+
+	// read Filename from stdin
+	filename, err := readFilePathFromStdio()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// This channel is used to send every read line from the read routine to the worker routines.
+	readChannel := make(chan string)
+
+	// This Channel is used to send Items into the priority queue serializer
+	itemChannel := make(chan *Item)
+	defer close(itemChannel)
+
+	// open the Input file
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	// Start the Reader
+	go fileReader(ctx, f, readChannel)
+
+	// Create the PriorityQueue
+	iq := make(ItemQueue, 0)
+	heap.Init(&iq)
+
+	// Serialize access to the priority queue
+	go func() {
+		for i := range itemChannel {
+
+			//fmt.Printf("ITEM: %#v\n", i)
+
+			heap.Push(&iq, i)
+			iq.update(i, i.url, i.priority)
+
+			// If the Queue is bigger than maxSize let's pop the `lowest priority` element out
+			// To keep in the list only maxSize elements with the highest priority
+			if iq.Len() > queueMaxSize {
+				heap.Pop(&iq)
+			}
+
+		}
+	}()
+
+	// Start the workers to process the records
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go processRecord(ctx, i, readChannel, itemChannel)
+	}
+
+	wg.Wait()
+
+	//fmt.Printf("\nElements in queue: %d\n\n", iq.Len())
+
+	// extract all the elements in the queue and print in reverse order
+	var urls []string
+
+	// Ensure the queue is of correct size, pop any low priority element above the MaxSize
+	for iq.Len() > queueMaxSize {
+		heap.Pop(&iq)
+	}
+
+	// Extract the Items into the urls slice
+	for iq.Len() > 0 {
+		popItem := heap.Pop(&iq).(*Item)
+		urls = append(urls, popItem.url)
+	}
+
+	// Print URLs in reverse order
+	for i := 1; i <= len(urls); i++ {
+		fmt.Println(urls[len(urls)-i])
+	}
+
 }
 
 // https://pkg.go.dev/container/heap#example-package-PriorityQueue
