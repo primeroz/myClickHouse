@@ -7,10 +7,10 @@ All code tested on Linux
 ```mermaid
 flowchart LR
     A[DATAFILE] -->|Single Thread| B(READER)
-    B -->|1 Row| C{WORKER1}
-    B -->|1 Row| D{WORKER2}
-    B -->|1 Row| E{WORKER3}
-    B -->|1 Row| F{WORKER4}
+    B -->|Batch Rows| C{WORKER1}
+    B -->|Batch Rows| D{WORKER2}
+    B -->|Batch Rows| E{WORKER3}
+    B -->|Batch Rows| F{WORKER4}
     C -->G[Queue TOP10]
     D -->G[Queue TOP10]
     E -->G[Queue TOP10]
@@ -63,7 +63,6 @@ make test
 10000000 /dev/shm/output.txt
 ```
 ```
-➜ bash -c "time (echo "/dev/shm/output.txt"| ./parser)"
 http://api.tech.com/item/6126076
 http://api.tech.com/item/3005721
 http://api.tech.com/item/3840952
@@ -75,9 +74,9 @@ http://api.tech.com/item/2236773
 http://api.tech.com/item/3735303
 http://api.tech.com/item/1017977
 
-real    0m8.386s
-user    0m14.310s
-sys     0m1.226s
+real    0m4.994s
+user    0m7.627s
+sys     0m0.731s
 ```
 ```
 ➜ bash -c "time ( cat /dev/shm/output.txt | sort -k 2 -n -r | head -n 10 )"
