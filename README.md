@@ -2,6 +2,21 @@
 
 All code tested on Linux
 
+## Flow
+
+```mermaid
+flowchart LR
+    A[DATAFILE] -->|Single Thread| B(READER)
+    B -->|1 Row| C{WORKER1}
+    B -->|1 Row| D{WORKER2}
+    B -->|1 Row| E{WORKER3}
+    B -->|1 Row| F{WORKER4}
+    C -->G[Queue TOP10]
+    D -->G[Queue TOP10]
+    E -->G[Queue TOP10]
+    F -->G[Queue TOP10]
+```
+
 ## Test Data
 
 There is already a test data file in `data/output.txt` of roughly 400K lines
