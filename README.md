@@ -25,8 +25,7 @@ There is already a dataset file in `data/data.txt` of roughly 400K lines
 
 To generate a different data set (with 1M elements) run
 ```
-cd data
-./generate-data.sh 1000000
+make data DATASIZE=1000000
 ```
 
 This will take a `while` to complete
@@ -35,22 +34,18 @@ This will take a `while` to complete
 
 To run the parser with the `data.txt` file in the data directory
 ```
-cd parser
 make run
 ```
 
 to Run the parser with another file as input 
 ```
-cd parser
 make build
-echo "PATH_TO_THE_FILE" | ./parser
+echo "PATH_TO_THE_FILE" | ./parser/parser
 ```
 
 ### Runing Tests
 To run the simple test
 ```
-cd parser
-make clean
 make test
 ```
 
@@ -58,11 +53,15 @@ make test
 ## Benchmarks
 
 ### 10000000 Lines
+*10M lines in the data file*
 ```
 ➜ wc -l /dev/shm/data.txt
 10000000 /dev/shm/data.txt
 ```
+
+*Use the parser* 
 ```
+➜ bash -c "time (echo "/dev/shm/data.txt"| ./parser/parser)"
 http://api.tech.com/item/6126076
 http://api.tech.com/item/3005721
 http://api.tech.com/item/3840952
@@ -74,10 +73,11 @@ http://api.tech.com/item/2236773
 http://api.tech.com/item/3735303
 http://api.tech.com/item/1017977
 
-real    0m4.994s
-user    0m7.627s
-sys     0m0.731s
+real    0m4.982s
+user    0m7.741s
+sys     0m0.748s
 ```
+*Use Linux tools* 
 ```
 ➜ bash -c "time ( cat /dev/shm/data.txt | sort -k 2 -n -r | head -n 10 )"
 http://api.tech.com/item/6126076 4294967182
