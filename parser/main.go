@@ -127,7 +127,6 @@ func main() {
 
 	// This Channel is used to send Items into the priority queue serializer
 	itemChannel := make(chan *Item)
-	defer close(itemChannel)
 
 	// open the Input file
 	f, err := os.Open(filename)
@@ -167,9 +166,10 @@ func main() {
 		go processRecord(ctx, i, readChannel, itemChannel)
 	}
 
+	// Wait for all worker threads to finish
 	wg.Wait()
-
-	//fmt.Printf("\nElements in queue: %d\n\n", iq.Len())
+	// Close the items Channel now that the sender threads have completed
+	close(itemChannel)
 
 	// extract all the elements in the queue and print in reverse order
 	var urls []string
