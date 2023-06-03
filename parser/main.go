@@ -49,22 +49,45 @@ func readFilePathFromStdio() (path string, err error) {
 // Read all lines from file and send them into channel
 // XXX: Only one routine to read the whole file, this assumes we are not CPU bound.
 // TODO: For multiple routines i need to control the file seek for each routine
-func fileReader(ctx context.Context, f io.Reader, channel chan string) {
+func fileReader(ctx context.Context, f io.Reader, channel chan []string, batchSize int) {
+
+	defer close(channel)
+
 	// Create the scanner for the open file
 	scanner := bufio.NewScanner(f)
 
-	for scanner.Scan() {
-		row := scanner.Text()
-		channel <- row
-	}
+	// hold batches of rows to send into the channel
+	rowsBatch := []string{}
 
-	close(channel)
+	for {
+
+		scanned := scanner.Scan()
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			row := scanner.Text()
+			if len(rowsBatch) == batchSize || !scanned {
+				channel <- rowsBatch
+				rowsBatch = []string{} // Clear the batch holder
+			}
+			rowsBatch = append(rowsBatch, row) // add current row to batch
+
+		}
+
+		// If scan is finished
+		if !scanned {
+			return
+		}
+
+	}
 
 }
 
 // Worker Function
 // Process each line , create an Item and push it into the itemChannel for the queue manager to handle
-func processRecord(ctx context.Context, id int, readChannel chan string, itemChannel chan *Item) {
+func processRecord(ctx context.Context, id int, readChannel chan []string, itemChannel chan *Item) {
 	defer wg.Done()
 	localReadLines := 0
 
@@ -72,32 +95,34 @@ func processRecord(ctx context.Context, id int, readChannel chan string, itemCha
 		log.Printf("%d Worker thread has started", id)
 	}
 
-	for row := range readChannel {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			localReadLines++
+	for batch := range readChannel {
+		for _, row := range batch {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				localReadLines++
 
-			split := strings.Fields(row)
-			url := split[0]
+				split := strings.Fields(row)
+				url := split[0]
 
-			priority, err := strconv.ParseInt(split[1], 10, 64)
-			if err != nil {
-				log.Printf("Failed to convert string %s to int64\n", split[1])
-				continue
+				priority, err := strconv.ParseInt(split[1], 10, 64)
+				if err != nil {
+					log.Printf("Failed to convert string %s to int64\n", split[1])
+					continue
+				}
+
+				// Create a new Item and push it in the itemChannel
+				item := &Item{
+					url:      url,
+					priority: priority,
+				}
+
+				itemChannel <- item
+
 			}
-
-			// Create a new Item and push it in the itemChannel
-			item := &Item{
-				url:      url,
-				priority: priority,
-			}
-
-			itemChannel <- item
 
 		}
-
 	}
 
 	if os.Getenv("LOG_DEBUG") != "" {
@@ -123,7 +148,7 @@ func main() {
 	}
 
 	// This channel is used to send every read line from the read routine to the worker routines.
-	readChannel := make(chan string)
+	readChannel := make(chan []string)
 
 	// This Channel is used to send Items into the priority queue serializer
 	itemChannel := make(chan *Item)
@@ -136,7 +161,7 @@ func main() {
 	defer f.Close()
 
 	// Start the Reader
-	go fileReader(ctx, f, readChannel)
+	go fileReader(ctx, f, readChannel, batchSize)
 
 	// Create the PriorityQueue
 	iq := make(ItemQueue, 0)
