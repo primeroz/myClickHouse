@@ -27,11 +27,11 @@ flowchart LR
 
 ### Reading the datafile
 
-The reading of the lines from the datafile is done through a `single routine` to keep the read operation simple without the need to track the position for each read thread. Parallelizing reading might be much easier if multiple input files were to be used.
+Reading of the lines from the _datafile_ is done through a `single routine` to keep the read operation simple without the need to track the position for _each_ read thread. Parallelizing reading might be much easier if multiple input files were to be used.
 
-While not ideal this will not be a problem unless the read of data gets CPU bound which should not happen as long as the `processing` of the records is the most intensive operation for which the _spare_ threads are used
+While not ideal this will not be a problem unless the read of data gets CPU bound which should not happen as long as the `processing` of the records is the most cpu intensive operation.
 
-The lines read from the datafile are split into batches to be processed by each worker thread through a `channel` shared between those routines
+The lines read from the datafile are split into `batches` to be processed by each worker thread through a `channel` shared between those routines
 
 ### Processing the records
 
@@ -43,9 +43,9 @@ Each worker thread pulls a `batch` of lines from the `channel` shared with the r
 
 The list of elements with the `highest value` is managed through a `priority queue` using the `heap container` packages. 
 
-From `Wikipedia` : `A heap is usually an array of objects that can be thought of as a tree. In a queue` 
+From `Wikipedia` : `A heap is usually an array of objects that can be thought of as a tree.` 
 
-In the case of this Parser we are only interested in the `TOP 10` elements ( by priority/value ) in the queue but , as described in the docs, `The complexity is O(log n) where n = h.Len()`, so in order to keep the queue as small as possible (and so the complexity of any queue operation) at any given time the `LESS` function has been modified to allow for `POP()` to return the `lowest priority` element in the queue. 
+In the case of this Parser we are only interested in the `TOP 10` elements ( by priority/value ) in the queue but , as described in the docs, `The complexity is O(log n) where n = h.Len()` so ,in order to keep the queue, and the complexity, as small as possible at any given time the `LESS()` function has been modified to allow for `POP()` to remove the `lowest priority` element from the queue. 
 
 A separate `go routine` is used as a `Queue Manager` because the heap is not thread safe and so it can't be handled by multiple worker thread at the same time. A channel is used to push `Items` from the worker threads into the queue manager thread which then `Pushes` Items into the queue, prioritize them according to the Value and pop low priority elements out when the queue is bigger than 10
 
