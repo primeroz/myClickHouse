@@ -7,8 +7,8 @@ help: # Show help for each of the Makefile recipes.
 build: # Build the binary
 	go build -o ${BINARY_NAME} main.go
 
-run: build # Run the parser using ../data/output.txt as input
-	echo "../data/output.txt" | ./${BINARY_NAME}
+run: build # Run the parser using ../data/data.txt as input
+	echo "../data/data.txt" | ./${BINARY_NAME}
 
 clean: # Clean the project
 	go clean -testcache

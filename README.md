@@ -21,7 +21,7 @@ flowchart LR
 
 ### Input Data
 
-There is already a dataset file in `data/output.txt` of roughly 400K lines
+There is already a dataset file in `data/data.txt` of roughly 400K lines
 
 To generate a different data set (with 1M elements) run
 ```
@@ -33,7 +33,7 @@ This will take a few hours to complete
 
 ### Running the Parser
 
-To run the parser with the `output.txt` file in the data directory
+To run the parser with the `data.txt` file in the data directory
 ```
 cd parser
 make run
@@ -59,8 +59,8 @@ make test
 
 ### 10000000 Lines
 ```
-➜ wc -l /dev/shm/output.txt
-10000000 /dev/shm/output.txt
+➜ wc -l /dev/shm/data.txt
+10000000 /dev/shm/data.txt
 ```
 ```
 http://api.tech.com/item/6126076
@@ -79,7 +79,7 @@ user    0m7.627s
 sys     0m0.731s
 ```
 ```
-➜ bash -c "time ( cat /dev/shm/output.txt | sort -k 2 -n -r | head -n 10 )"
+➜ bash -c "time ( cat /dev/shm/data.txt | sort -k 2 -n -r | head -n 10 )"
 http://api.tech.com/item/6126076 4294967182
 http://api.tech.com/item/3005721 4294966996
 http://api.tech.com/item/3840952 4294965139
